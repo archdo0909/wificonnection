@@ -1,9 +1,7 @@
 from notebook.utils import url_path_join as ujoin
 from notebook.base.handlers import IPythonHandler
 import os, json, git, urllib, requests
-from git import Repo, GitCommandError
 from subprocess import Popen, PIPE, TimeoutExpired, SubprocessError
-import numpy as np
 
 
 class WifiHandler(IPythonHandler):
