@@ -4,12 +4,12 @@ import os, json, urllib, requests
 from subprocess import Popen, PIPE, TimeoutExpired, SubprocessError
 import subprocess
 
+interface_name = 'wlan0'
+sudo_password = 'luxrobo'
+
 class WifiHandler(IPythonHandler):
     
     # input system call parameter
-    interface_name = 'wlx88366cf69460'
-    sudo_password = 'luxrobo'
-
     def select_cmd(self, x):
 
         # choose the commands want to call
@@ -88,8 +88,10 @@ class CurrentWifiHandler(WifiHandler):
         if wlan0_info != 'off/any':
             wifi_info['wifi_status'] = True
             wifi_info['wifi_SSID'] = wlan0_info
+        
+        wifi_info_json = json.dumps(wifi_info)
 
-        return wifi_info
+        return wifi_info_json
                 
 
     def get(self):
