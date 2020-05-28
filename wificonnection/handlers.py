@@ -4,8 +4,8 @@ import os, json, urllib, requests
 from subprocess import Popen, PIPE, TimeoutExpired, SubprocessError
 import subprocess
 
-interface_name = 'wlx88366cf69460'
-sudo_password = 'luxrobo'
+interface_name = 'wlan0'
+sudo_password = 'raspberry'
 
 class WifiHandler(IPythonHandler):
     
@@ -34,7 +34,7 @@ class WifiHandler(IPythonHandler):
             subprocess.run(cmd)
         except SubprocessError as e:
             print(e)
-            print('interface up error')
+            self.error_and_return('interface up error')
             return
 
     def interface_down(self):
@@ -45,7 +45,7 @@ class WifiHandler(IPythonHandler):
             subprocess.run(cmd)
         except SubprocessError as e:
             print(e)
-            print('interfae down error')
+            self.error_and_return('interfae down error')
             return
     
 class CurrentWifiHandler(WifiHandler):
@@ -64,6 +64,7 @@ class CurrentWifiHandler(WifiHandler):
                 output = [x.decode('utf-8') for x in output]
         except SubprocessError as e:
             print(e)
+            self.error_and_return('Improper Popen object opened')
             return
 
         try:
@@ -71,7 +72,7 @@ class CurrentWifiHandler(WifiHandler):
             assert len(inter_info) != 0
         except AssertionError as e:
             print(e)
-            print("Cannot find wlan0 device interface")
+            self.error_and_return("Cannot find wlan0 device interface")
             return
 
         inter_info = inter_info[0].split(' ')
