@@ -1,0 +1,26 @@
+.wifi-connect{border-bottom: 1px solid #e5e5e5}
+
+.toggle-wrap {
+  display: inline-block;
+  position: relative;
+  padding: 3px 0;
+  width: 34px;
+  height: 20px;
+}
+.toggle-bar {
+  display: inline-block;
+  width: 34px;
+  height: 14px;
+  border-radius: 7px;
+  background-color: rgba(69, 214, 223, 0.38);
+}
+
+.toggle-thumb {
+  position: absolute;
+  top:0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  background-color: #45d6df;
+  border-radius: 10px;
+}

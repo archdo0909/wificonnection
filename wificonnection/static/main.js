@@ -1,4 +1,4 @@
-define(['base/js/namespace','base/js/dialog','jquery'],function(IPython, dialog, $, mc){
+define(['require','base/js/namespace','base/js/dialog','jquery'],function(requirejs, IPython, dialog, $){
 
     // we will define an action here that should happen when we ask to clear and restart the kernel.
     var search_wifi  = {
@@ -6,6 +6,22 @@ define(['base/js/namespace','base/js/dialog','jquery'],function(IPython, dialog,
         icon : 'fa-wifi',
         help_index : '',
         handler : function (env) {
+
+            $('<link />').attr({
+                rel: 'stylesheet',
+                type: 'text/css',
+                href: requirejs.toUrl('./main.css')
+            }).appendTo('head')
+
+            var p = $('<p class="wifi-connect" />').text("Wifi")
+            var toggleDiv = $('<button class="btn-toggle" />')
+
+            p.append(toggleDiv);
+            var div = $('<div/>')
+            div.append(p)
+
+            var container = $('#notebook-container')
+
             var settings = {
                 url : '/wifi/scan',
                 processData : false,
@@ -58,32 +74,66 @@ define(['base/js/namespace','base/js/dialog','jquery'],function(IPython, dialog,
             // }
 
 
-            // dialog.modal({
-            //     body: div ,
-            //     title: 'Commit and Push Notebook',
-            //     buttons: {'Commit and Push':
-            //                 { class:'btn-primary btn-large',
-            //                   click:on_ok
-            //                 },
-            //               'Cancel':{}
-            //         },
-            //     notebook:env.notebook,
-            //     keyboard_manager: env.notebook.keyboard_manager,
-            // })
+            dialog.modal({
+                body: div ,
+                title: 'Wifi list',
+                // buttons: {'Commit and Push':
+                //             { class:'btn-primary btn-large',
+                //               click:on_ok
+                //             },
+                //           'Cancel':{}
+                //     },
+                notebook:env.notebook,
+                keyboard_manager: env.notebook.keyboard_manager,
+            })
 
         }
     }
 
+    var current_wifi = {
+        help: 'wifi',
+        icon : 'fa-wifi',
+        help_index : '',
+        handler : function (env) {
+
+        
+
+
+            var currentSettings = {
+                url : '/wifi/current',
+                processData : false,
+                type : "GET",
+                dataType: "json",
+                contentType: 'application/json',
+                success: function(data) {
+
+                    // display feedback to user
+                    console.log(data)
+                },
+                error: function(data) {
+
+                    // display feedback to user
+                    console.log('error')
+                }
+
+            };
+
+            $.ajax(currentSettings);
+
+
+        }
+    }
     function _on_load(){
 
         // log to console
-        console.info('wifi')
+        console.info('wifis')
 
         // register new action
         var action_name = IPython.keyboard_manager.actions.register(search_wifi, 'search wifi list')
+        var action_name2 = IPython.keyboard_manager.actions.register(current_wifi, 'current wifi list')
 
         // add button for new action
-        IPython.toolbar.add_buttons_group([action_name])
+        IPython.toolbar.add_buttons_group([action_name, action_name2])
 
     }
 
