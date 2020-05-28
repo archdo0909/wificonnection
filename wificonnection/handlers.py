@@ -106,7 +106,6 @@ class WifiListHandler(WifiHandler):
     def get(self):        
         
         cmd = self.select_cmd('search_wifi_list')
-        ssid_set = set()
         # scan wifi list
         try:
             with Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE) as proc:
@@ -115,25 +114,44 @@ class WifiListHandler(WifiHandler):
                 # handling exception of commands execution
             assert output[1].decode() == ''
         except AssertionError as e:
-            self.error_and_return('Wifi scanning failed')
+            # self.error_and_return('Wifi scanning failed')
             return
         except SubprocessError as e:
             print(e)
-            self.error_and_return('Improper Popen object opened')
+            # self.error_and_return('Improper Popen object opened')
             return
 
         # parsing all ssid list
+        ssid_cnt = 0
+        tmp_scanned_wifi_info = dict()
         for each_line in output[0].decode('utf-8').split('\n'):
-            if each_line.find('SSID:') != -1:
-                each_line = each_line.split(' ')[1:]
-                ssid_set.add(each_line[0])
+            tmp_each_info = []
+            if each_line.find('BSS') != -1 and each_line.find('on wlan0') != -1:
+                if ssid_cnt != 0 and len(tmp_scanned_wifi_info.get(ssid_cnt)) == 2:
+                    tmp_scanned_wifi_info[ssid_cnt].append("FREE")
+                ssid_cnt += 1
+                tmp_scanned_wifi_info[ssid_cnt] = []
+            elif each_line.find('signal') != -1:
+                tmp_scanned_wifi_info[ssid_cnt].append(each_line.split(' ')[1])
+            elif each_line.find('SSID:') != -1:
+                tmp_ssid = each_line.split(' ')[1]
+                if tmp_ssid != '' and tmp_ssid.find('x00') == -1:
+                    tmp_scanned_wifi_info[ssid_cnt].append(tmp_ssid)
+            elif each_line.find('RSN') != -1:
+                tmp_scanned_wifi_info[ssid_cnt].append('PSK')
 
-        ssid_list = [x for x in ssid_set 
-                        if x != "" and x.find('x00') == -1]
+        # Sort out the duplicate value and generate json format 
+        df_scanned_wifi_info = pd.DataFrame(data=tmp_scanned_wifi_info.values(),
+                                                columns=['SIGNAL', 'SSID', 'PSK'])[['SSID', 'PSK', 'SIGNAL']]
+        df_tmp_psk = df_scanned_wifi_info[['SSID', 'PSK']].drop_duplicates()
+        df_tmp_signal = df_scanned_wifi_info.groupby('SSID').SIGNAL.min().reset_index(name = "SIGNAL")
+        wifi_info = pd.merge(
+            df_tmp_psk, df_tmp_signal, how="inner", on="SSID"
+        ).sort_values(by=['SIGNAL']).set_index('SSID', drop=True).T.to_dict('list')
 
         self.write({'status': 200, 
                     'statusText': 'Wifi scanning success',
-                    'data' : ssid_list
+                    'data' : wifi_info
         }) 
 
 def setup_handlers(nbapp):
