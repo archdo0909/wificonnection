@@ -3,6 +3,7 @@ from notebook.base.handlers import IPythonHandler
 import os, json, urllib, requests
 from subprocess import Popen, PIPE, TimeoutExpired, SubprocessError
 import subprocess
+import pandas as pd
 
 interface_name = 'wlan0'
 sudo_password = 'raspberry'
