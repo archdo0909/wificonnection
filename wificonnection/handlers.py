@@ -2,6 +2,7 @@ from notebook.utils import url_path_join as ujoin
 from notebook.base.handlers import IPythonHandler
 import os, json, urllib, requests
 from subprocess import Popen, PIPE, TimeoutExpired, SubprocessError
+import subprocess
 
 class WifiHandler(IPythonHandler):
     
@@ -13,10 +14,11 @@ class WifiHandler(IPythonHandler):
 
         # choose the commands want to call
         return {
+            'iwconfig' : ['iwconfig'],
             'search_wifi_list' : ['sudo', 'iw', interface_name, 'scan'],
             'interface_down' : ['sudo', 'ifconfig', interface_name, 'down'],
             'interface_up' : ['sudo', 'ifconfig', interface_name, 'up'],
-            'current_wifi' : ['sudo', 'wpa_cli', interface_name, 'list_networks']
+            'current_wifi' : ['wpa_cli', '-i', interface_name, 'list_networks']
         }.get(x, None)
 
     def error_and_return(self, reason):
@@ -53,17 +55,51 @@ class CurrentWifiHandler(WifiHandler):
         # send error
         self.send_error(500, reason=reason)
 
-    def get(self):
+    def get_current_wifi_info(self):
+        
+        wifi_info = {
+            'wifi_status' : False,
+            'wifi_SSID' : None
+        }
 
-        cmd = self.select_cmd('current_wifi')        
-        # get current connected wifi
+        cmd = self.select_cmd('iwconfig')
         try:
             with Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE) as proc:
-                output = proc.communicate(input=(sudo_password+'\n').encode())
-        except:
-            print('error')
+                output = proc.communicate()
+                output = [x.decode('utf-8') for x in output]
+        except SubprocessError as e:
+            print(e)
+            return
+
+        try:
+            inter_info = [x for x in output if x.find('wlan0') != -1]
+            assert len(inter_info) != 0
+        except AssertionError as e:
+            print(e)
+            print("Cannot find wlan0 device interface")
+            return
+
+        inter_info = inter_info[0].split(' ')
         
-        print(type(output))
+        for data in inter_info:
+            if data.find('ESSID') != -1:
+                wlan0_info = data.split(':')[1]
+
+        if wlan0_info != 'off/any':
+            wifi_info['wifi_status'] = True
+            wifi_info['wifi_SSID'] = wlan0_info
+
+        return wifi_info
+                
+
+    def get(self):
+
+        current_wifi_info = self.get_current_wifi_info()
+
+        self.write({'status': 200, 
+                    'statusText': 'current wifi information',
+                    'data' : current_wifi_info
+        }) 
         
 
 class WifiListHandler(WifiHandler):
