@@ -4,6 +4,7 @@ import os, json, urllib, requests
 from subprocess import Popen, PIPE, TimeoutExpired, SubprocessError
 import subprocess
 import pandas as pd
+from collections import OrderedDict
 
 interface_name = 'wlan0'
 sudo_password = 'raspberry'
@@ -20,6 +21,7 @@ class WifiHandler(IPythonHandler):
             'interface_down' : ['sudo', 'ifconfig', interface_name, 'down'],
             'interface_up' : ['sudo', 'ifconfig', interface_name, 'up'],
             'current_wifi' : ['wpa_cli', '-i', interface_name, 'list_networks']
+            'is_wlan0_up' : ['sudo', 'iwlist', interface_name, 'down']
         }.get(x, None)
 
     def error_and_return(self, reason):
@@ -37,6 +39,8 @@ class WifiHandler(IPythonHandler):
             print(e)
             self.error_and_return('interface up error')
             return
+        
+        self.is_inter_up = True
 
     def interface_down(self):
 
@@ -48,8 +52,17 @@ class WifiHandler(IPythonHandler):
             print(e)
             self.error_and_return('interfae down error')
             return
-    
-class CurrentWifiHandler(WifiHandler):
+        
+        self.is_inter_up = False
+
+    def is_interface_off(self, tmp_str):
+
+        tmp_str = tmp_str.decode('utf-8')
+        if tmp_str.find('Resource temporarily unavailable') != -1:
+            return False
+        elif tmp_str.find('Network is down') != -1:
+            return True
+
 
     def get_current_wifi_info(self):
         
@@ -89,38 +102,42 @@ class CurrentWifiHandler(WifiHandler):
         # wifi_info_json = json.dumps(wifi_info)
 
         return wifi_info
-                
+    
+    def is_wifi_connected(self, current_wifi_info):
+        """ True/false whether wifi connected
+        """
 
-    def get(self):
+        return current_wifi_info.get('wifi_status')
 
-        current_wifi_info = self.get_current_wifi_info()
+    def scan_candidate_wifi(self):
+        """ scanning candidate wifi information
+            return : {
+                'SSID' : ['PSK', 'Signal Strength']
+            }
+        """
 
-        self.write({'status': 200, 
-                    'statusText': 'current wifi information',
-                    'data' : current_wifi_info
-        }) 
-        
-
-class WifiListHandler(WifiHandler):
-
-    # return the possible wifi list
-    def get(self):        
-        
         cmd = self.select_cmd('search_wifi_list')
         # scan wifi list
-        try:
-            with Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE) as proc:
-                output = proc.communicate(input=(sudo_password+'\n').encode())
-
-                # handling exception of commands execution
-            assert output[1].decode() == ''
-        except AssertionError as e:
-            # self.error_and_return('Wifi scanning failed')
-            return
-        except SubprocessError as e:
-            print(e)
-            # self.error_and_return('Improper Popen object opened')
-            return
+        self.is_inter_up = False
+        while True:
+            try:
+                with Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE) as proc:
+                    output = proc.communicate(input=(sudo_password+'\n').encode())
+            except SubprocessError as e:
+                print(e)
+                self.error_and_return('Improper Popen object opened')
+                return
+            
+            if output[1] == b'':
+                self.is_interface_up = True
+                break
+            elif output[0] == b'':
+                if self.is_interface_off(output[1]):
+                    self.write({'status': 200, 'statusText': 'interface off'})
+                    return
+                else:
+                    print('resource busy')
+                    pass
 
         # parsing all ssid list
         ssid_cnt = 0
@@ -150,10 +167,39 @@ class WifiListHandler(WifiHandler):
             df_tmp_psk, df_tmp_signal, how="inner", on="SSID"
         ).sort_values(by=['SIGNAL']).set_index('SSID', drop=True).T.to_dict('list')
 
-        self.write({'status': 200, 
-                    'statusText': 'Wifi scanning success',
-                    'data' : wifi_info
-        }) 
+        return wifi_info
+        
+
+class WifiGetter(WifiHandler):
+
+    # return the possible wifi list
+    def get(self):        
+        """ Communication interface with jupyter notebook
+        """
+
+        wifi_list = self.scan_candidate_wifi()
+        if self.is_inter_up:
+            current_wifi = self.get_current_wifi_info
+
+            self.write({'status': 200, 
+                        'statusText': 'current wifi information',
+                        'current_wifi_data' : current_wifi_info,
+                        'whole_wifi_data' : wifi_list
+            })
+
+        # if is_wifi_connected(current_wifi_info):
+        #     wifi_info = self.scan_candidate_wifi()
+  
+        #     for each_info in wifi_info.keys():
+        #         if each_info == current_wifi_info.get('wifi_SSID'):
+        #             wifi_info.get(each_info).append('current')
+        #         else:
+        #             wifi_info.get(each_info).append('off')
+
+        # self.write({'status': 200, 
+        #             'statusText': 'Wifi scanning success',
+        #             'data' : wifi_info
+        # })
 
 def setup_handlers(nbapp):
     # Determine whether wifi connected
@@ -162,4 +208,4 @@ def setup_handlers(nbapp):
 
     # Scanning wifi list
     route_pattern_wifi_list = ujoin(nbapp.settings['base_url'], '/wifi/scan')
-    nbapp.add_handlers('.*', [(route_pattern_wifi_list, WifiListHandler)])
+    nbapp.add_handlers('.*', [(route_pattern_wifi_list, WifiGetter)])
