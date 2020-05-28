@@ -4,18 +4,48 @@ import os, json, git, urllib, requests
 from subprocess import Popen, PIPE, TimeoutExpired, SubprocessError
 
 class WifiHandler(IPythonHandler):
-
+    
     # input system call parameter
     interface_name = 'wlx88366cf69460'
     sudo_password = 'luxrobo'
-    commands_wifi_list = ['sudo', 'iw', interface_name, 'scan']
-    commands_current_wifi = ['sudo', 'wpa_cli', '-i', interface_name, 'list_networks']
+
+    def select_cmd(self, x):
+
+        # choose the commands want to call
+        return {
+            'search_wifi_list' : ['sudo', 'iw', interface_name, 'scan'],
+            'interface_down' : ['sudo', 'ifconfig', interface_name, 'down'],
+            'interface_up' : ['sudo', 'ifconfig', interface_name, 'up'],
+            'current_wifi' : ['sudo', 'wpa_cli', interface_name, 'list_networks']
+        }.get(x, None)
 
     def error_and_return(self, reason):
 
         # send error
         self.send_error(500, reason=reason)
 
+    def interface_up(self):
+
+        # raise the wireless interface 
+        cmd = self.select_cmd('interface_up')
+        try:
+            subprocess.run(cmd)
+        except SubprocessError as e:
+            print(e)
+            print('interface up error')
+            return
+
+    def interface_down(self):
+
+        # kill the wireless interface
+        cmd = self.select_cmd('interface_down')
+        try:
+            subprocess.run(cmd)
+        except SubprocessError as e:
+            print(e)
+            print('interfae down error')
+            return
+    
 class CurrentWifiHandler(WifiHandler):
 
     def error_and_return(self, reason):
@@ -24,10 +54,11 @@ class CurrentWifiHandler(WifiHandler):
         self.send_error(500, reason=reason)
 
     def get(self):
-        
+
+        cmd = self.select_cmd('current_wifi')        
         # get current connected wifi
         try:
-            with Popen(commands_current_wifi, stdin=PIPE, stdout=PIPE, stderr=PIPE) as proc:
+            with Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE) as proc:
                 output = proc.communicate(input=(sudo_password+'\n').encode())
         except:
             print('error')
@@ -45,10 +76,11 @@ class WifiListHandler(WifiHandler):
     # return the possible wifi list
     def get(self):        
         
+        cmd = self.select_cmd('search_wifi_list')
         ssid_set = set()
         # scan wifi list
         try:
-            with Popen(commands_wifi_list, stdin=PIPE, stdout=PIPE, stderr=PIPE) as proc:
+            with Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE) as proc:
                 output = proc.communicate(input=(sudo_password+'\n').encode())
 
                 # handling exception of commands execution
