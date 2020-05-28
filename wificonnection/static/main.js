@@ -6,29 +6,31 @@ define(['require','base/js/namespace','base/js/dialog','jquery'],function(requir
         icon : 'fa-wifi',
         help_index : '',
         handler : function (env) {
-
             $('<link />').attr({
                 rel: 'stylesheet',
                 type: 'text/css',
                 href: requirejs.toUrl('./main.css')
             }).appendTo('head')
 
-            var p = $('<p class="wifi-connect" />').text("Wifi")
-            var toggleDiv = $('<button class="btn-toggle" />')
+            var wifiList = ['LUXROBO1-5G','LUXROBO2-5G','LUXROBO3-5G','LUXROBO4-5G','LUXROBO5-5G','LUXROBO6-5G','LUXROBO7-5G','LUXROBO8-5G','LUXROBO9-5G']
+            var currentWifiData;
 
-            p.append(toggleDiv);
-            var div = $('<div/>')
-            div.append(p)
+            function addList(name) {
+                var wifiListLi = $('<li class="wifi-item" />')
+                var wifiButtonA = $('<a href="javascript:;" class="btn-wifi" />')
+                var wifiNameSpan = $('<span class="wifi-name" />')
+                var wifiPrivateSpan = $('<span class="wifi-private" />')
+                wifiListUl.append(wifiListLi.append(wifiButtonA.append(wifiNameSpan.text(name)).append(wifiPrivateSpan)))
+            }
 
-            var container = $('#notebook-container')
-
-            var settings = {
-                url : '/wifi/scan',
+            var currentSettings = {
+                url : '/wifi/current',
                 processData : false,
                 type : "GET",
                 dataType: "json",
                 contentType: 'application/json',
                 success: function(data) {
+                    currentWifiData = data
 
                     // display feedback to user
                     console.log(data)
@@ -40,7 +42,71 @@ define(['require','base/js/namespace','base/js/dialog','jquery'],function(requir
                 }
 
             };
+
+            // $.ajax(currentSettings)
+
+            var p = $('<p class="wifi-connect" />').text("Wifi")
+            var toggleDiv = $('<a href="javascript:;" class="toggle-wrap" />')
+            var toggleBar = $('<span class="toggle-bar"/>')
+            var toggleThumb = $('<span class="toggle-thumb">')
+            var progressImg = $('<img class="progress"/>').attr('src','./progress.svg');
+
+            progressImg.attr({
+                rel: 'stylesheet',
+                type: 'text/css',
+                src: requirejs.toUrl('./progress.svg')
+            })
+
+            toggleDiv.append(toggleBar).append(toggleThumb)
+
+            var settings = {
+                url : '/wifi/scan',
+                processData : false,
+                type : "GET",
+                dataType: "json",
+                contentType: 'application/json',
+                success: function(data) {
+                    wifiList = data.data
+                    // display feedback to user
+
+                    wifiList.forEach(function(v){
+                        addList(v)
+                    })
+                    console.log(data)
+                },
+                error: function(data) {
+
+                    // display feedback to user
+                    console.log('error')
+                }
+
+            };
             $.ajax(settings);
+
+            $(document).on('click', '.toggle-wrap', function(){
+                $(this).hasClass('active') ?  $(this).removeClass('active') :  $(this).addClass('active')
+            })
+
+            p.append(toggleDiv).append(progressImg)
+            var div = $('<div/>')
+            div.append(p)
+
+            var wifiListUl = $('<ul class="wifi-list"/>')
+
+
+
+
+
+
+
+            div.append(wifiListUl)
+
+
+
+
+            var container = $('#notebook-container')
+
+            
             // get the canvas for user feedback
             var container = $('#notebook-container');
 
@@ -77,6 +143,7 @@ define(['require','base/js/namespace','base/js/dialog','jquery'],function(requir
             dialog.modal({
                 body: div ,
                 title: 'Wifi list',
+                footer: wifiListUl,
                 // buttons: {'Commit and Push':
                 //             { class:'btn-primary btn-large',
                 //               click:on_ok

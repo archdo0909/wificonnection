@@ -4,7 +4,7 @@ import os, json, urllib, requests
 from subprocess import Popen, PIPE, TimeoutExpired, SubprocessError
 import subprocess
 
-interface_name = 'wlan0'
+interface_name = 'wlx88366cf69460'
 sudo_password = 'luxrobo'
 
 class WifiHandler(IPythonHandler):
@@ -50,11 +50,6 @@ class WifiHandler(IPythonHandler):
     
 class CurrentWifiHandler(WifiHandler):
 
-    def error_and_return(self, reason):
-
-        # send error
-        self.send_error(500, reason=reason)
-
     def get_current_wifi_info(self):
         
         wifi_info = {
@@ -72,7 +67,7 @@ class CurrentWifiHandler(WifiHandler):
             return
 
         try:
-            inter_info = [x for x in output if x.find('wlan0') != -1]
+            inter_info = [x for x in output if x.find(interface_name) != -1]
             assert len(inter_info) != 0
         except AssertionError as e:
             print(e)
@@ -89,9 +84,9 @@ class CurrentWifiHandler(WifiHandler):
             wifi_info['wifi_status'] = True
             wifi_info['wifi_SSID'] = wlan0_info
         
-        wifi_info_json = json.dumps(wifi_info)
+        # wifi_info_json = json.dumps(wifi_info)
 
-        return wifi_info_json
+        return wifi_info
                 
 
     def get(self):
@@ -105,11 +100,6 @@ class CurrentWifiHandler(WifiHandler):
         
 
 class WifiListHandler(WifiHandler):
-    
-    def error_and_return(self, reason):
-
-        # send error
-        self.send_error(500, reason=reason)
 
     # return the possible wifi list
     def get(self):        
