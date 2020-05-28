@@ -1,6 +1,6 @@
 from notebook.utils import url_path_join as ujoin
 from notebook.base.handlers import IPythonHandler
-import os, json, git, urllib, requests
+import os, json, urllib, requests
 from subprocess import Popen, PIPE, TimeoutExpired, SubprocessError
 
 class WifiHandler(IPythonHandler):
