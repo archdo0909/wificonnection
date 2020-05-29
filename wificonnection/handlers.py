@@ -8,10 +8,10 @@ from collections import OrderedDict
 
 interface_name = 'wlan0'
 sudo_password = 'raspberry'
-wpa_supplicnat = '/etc/wpa_supplicant/wpa_supplicant.conf'
-user_directory = '/home/pi/wpa_supplicant.conf'
+wpa_supplicant = '/etc/wpa_supplicant/wpa_supplicant.conf'
+user_directory = '/home/pi/temp.conf'
 
-class WifiHandler(IPythonHandler):
+class WifiHandler():
     
     # input system call parameter
     def select_cmd(self, x):
@@ -26,8 +26,9 @@ class WifiHandler(IPythonHandler):
             'wpa_select_network' : ['wpa_cli', '-i', interface_name, 'select_network'],
             'is_wlan0_up' : ['sudo', 'iwlist', interface_name, 'scan'],
             'interface_reconfigure' : ['wpa_cli', '-i', interface_name, 'reconfigure'],
-            'copy_wpa_supplicant' : ['sudo', 'cp', wpa_supplicnat, user_directory],
+            'copy_wpa_supplicant' : ['sudo', 'cp', wpa_supplicant, user_directory],
             'replace_wpa_supplicant' : ['sudo', 'mv', '-f', user_directory, wpa_supplicnat],
+            'delete_working_wpa' : ['rm', user_directory]
         }.get(x, None)
 
     def error_and_return(self, reason):
@@ -257,11 +258,44 @@ class WifiSetter(WifiHandler):
         else:
             pass
 
-    def connect_wifi(self):
+    def write_wpa(self, ssid, psk):
 
+        cmd = self.select_cmd('copy_wpa_supplicant')
+        try:
+            subprocess.run(cmd)
+        except SubprocessError as e:
+            print(e)
+            self.error_and_return('Copy wpa_supplicant error')
+            return
         
+        subprocess.run(cmd)
 
+        # write wifi config to file
+        with open(user_directory, 'a') as f:
 
+            f.write('\n')
+            f.write('network={\n')
+            f.write('    ssid="' + ssid + '"\n')
+            f.write('    psk="' + psk + '"\n')
+            f.write('}\n')
+            f.close()
+        
+        cmd = self.select_cmd('replace_wpa_supplicant')
+        try:
+            subprocess.run(cmd)
+        except SubprocessError as e:
+            print(e)
+            self.error_and_return('Replace error occur')
+            return
+
+        cmd = self.select_cmd('delete_working_wpa')
+        try:
+            subprocess.run(cmd)
+        except SubprocessError as e:
+            print(e)
+            self.error_and_return('Delete wpa error')
+            return
+    
 def setup_handlers(nbapp):
     # Determine whether wifi connected
     route_pattern_current_wifi = ujoin(nbapp.settings['base_url'], '/wifi/current')
