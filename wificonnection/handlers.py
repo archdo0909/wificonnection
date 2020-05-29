@@ -20,8 +20,10 @@ class WifiHandler(IPythonHandler):
             'search_wifi_list' : ['sudo', 'iw', interface_name, 'scan'],
             'interface_down' : ['sudo', 'ifconfig', interface_name, 'down'],
             'interface_up' : ['sudo', 'ifconfig', interface_name, 'up'],
-            'current_wifi' : ['wpa_cli', '-i', interface_name, 'list_networks']
-            'is_wlan0_up' : ['sudo', 'iwlist', interface_name, 'down']
+            'wpa_list' : ['wpa_cli', '-i', interface_name, 'list_networks'],
+            'wpa_select_network' : ['wpa_cli', '-i', interface_name, 'select_network'],
+            'is_wlan0_up' : ['sudo', 'iwlist', interface_name, 'scan'],
+            'interface_reconfigure' : ['wpa_cli', '-i', interface_name, 'reconfigure'],
         }.get(x, None)
 
     def error_and_return(self, reason):
@@ -99,8 +101,6 @@ class WifiHandler(IPythonHandler):
             wifi_info['wifi_status'] = True
             wifi_info['wifi_SSID'] = wlan0_info
         
-        # wifi_info_json = json.dumps(wifi_info)
-
         return wifi_info
     
     def is_wifi_connected(self, current_wifi_info):
@@ -128,16 +128,18 @@ class WifiHandler(IPythonHandler):
                 self.error_and_return('Improper Popen object opened')
                 return
             
+            # wlan0 interface is already opened
             if output[1] == b'':
                 self.is_interface_up = True
                 break
+            # wlan0 interface is closed or resource busy
             elif output[0] == b'':
                 if self.is_interface_off(output[1]):
-                    self.write({'status': 200, 'statusText': 'interface off'})
                     return
                 else:
                     print('resource busy')
                     pass
+            time.sleep(0.01)
 
         # parsing all ssid list
         ssid_cnt = 0
@@ -168,6 +170,50 @@ class WifiHandler(IPythonHandler):
         ).sort_values(by=['SIGNAL']).set_index('SSID', drop=True).T.to_dict('list')
 
         return wifi_info
+
+    def is_pi_have_ssid(self, data):
+        
+        cmd = self.select_cmd('wpa_list')
+        try:
+            with Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE) as proc:
+                output = proc.communicate(input=(sudo_password+'\n').encode())
+        except SubprocessError as e:
+            print(e)
+            self.error_and_return('Improper Popen object opened')
+            return
+
+        target_ssid = data.get('ssid')
+        output = output[0].decode('utf-8')
+        target_line = [line for line in output.split('\n') if line.find(target_ssid) == -1]
+        wifi_index = int(target_line[1][0])
+
+        if wifi_index >= 0:
+            return wifi_index
+        else:
+            return -1
+
+    def select_network(self, index):
+        cmd = self.select_cmd('wpa_select_network')
+        cmd.append(str(index))
+
+        try:
+            subprocess.run(cmd)
+        except SubprocessError as e:
+            print(e)
+            self.error_and_return('Improper Popen object opened')
+            return
+
+        # Check if wifi connect
+        cmd = self.select_cmd('iwconfig')
+        while True:
+            wifi_info = self.get_current_wifi_info()
+            if wifi_info.get('wifi_status'):
+                break
+            time.sleep(0.01)
+
+        return wifi_info
+                
+        
         
 
 class WifiGetter(WifiHandler):
@@ -177,29 +223,38 @@ class WifiGetter(WifiHandler):
         """ Communication interface with jupyter notebook
         """
 
+        # deteremine the wireless status of raspberry Pi
         wifi_list = self.scan_candidate_wifi()
         if self.is_inter_up:
             current_wifi = self.get_current_wifi_info
 
-            self.write({'status': 200, 
-                        'statusText': 'current wifi information',
+            self.write({'status' : 200, 
+                        'statusText' : 'current wifi information',
                         'current_wifi_data' : current_wifi_info,
                         'whole_wifi_data' : wifi_list
             })
+        else: 
+            self.write({'status' : 200, 'statusText' : 'interface off'})
 
-        # if is_wifi_connected(current_wifi_info):
-        #     wifi_info = self.scan_candidate_wifi()
-  
-        #     for each_info in wifi_info.keys():
-        #         if each_info == current_wifi_info.get('wifi_SSID'):
-        #             wifi_info.get(each_info).append('current')
-        #         else:
-        #             wifi_info.get(each_info).append('off')
+class WifiSetter(WifiHandler):
+    
+    def put(self):
+        
+        data = {
+            'ssid' : 'DREAMPLUS_GEUST',
+            'psk' : 'welcome#'
+        }
 
-        # self.write({'status': 200, 
-        #             'statusText': 'Wifi scanning success',
-        #             'data' : wifi_info
-        # })
+        target_index = self.is_pi_have_ssid(data)
+        # raspberrypi already have target wifi information
+        if target_index >= 0:
+            wifi_info = self.select_network(target_index)
+        # raspberrypi do not have target wifi information
+        else:
+            pass
+
+        
+
 
 def setup_handlers(nbapp):
     # Determine whether wifi connected
