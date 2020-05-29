@@ -8,6 +8,8 @@ from collections import OrderedDict
 
 interface_name = 'wlan0'
 sudo_password = 'raspberry'
+wpa_supplicnat = '/etc/wpa_supplicant/wpa_supplicant.conf'
+user_directory = '/home/pi/wpa_supplicant.conf'
 
 class WifiHandler(IPythonHandler):
     
@@ -24,6 +26,8 @@ class WifiHandler(IPythonHandler):
             'wpa_select_network' : ['wpa_cli', '-i', interface_name, 'select_network'],
             'is_wlan0_up' : ['sudo', 'iwlist', interface_name, 'scan'],
             'interface_reconfigure' : ['wpa_cli', '-i', interface_name, 'reconfigure'],
+            'copy_wpa_supplicant' : ['sudo', 'cp', wpa_supplicnat, user_directory],
+            'replace_wpa_supplicant' : ['sudo', 'mv', '-f', user_directory, wpa_supplicnat],
         }.get(x, None)
 
     def error_and_return(self, reason):
@@ -252,6 +256,8 @@ class WifiSetter(WifiHandler):
         # raspberrypi do not have target wifi information
         else:
             pass
+
+    def connect_wifi(self):
 
         
 
